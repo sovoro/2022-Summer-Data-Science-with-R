@@ -1,0 +1,149 @@
+---
+title: "Tidyverse Practice"
+author: "Kyusun"
+date: "2022-07-24"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+이것은 R Markdown 파일입니다. 위에 Knit이라고 보이는 부분에서 "Knit to Word"를 선택해주세요. 혹시 에러가 뜬다면, 그냥 rmd파일 그대로 제출해도 됩니다. 코드는 회색 부분에 작성하시면 됩니다. word로 변환한 후, pdf로 다시 저장하시고, 이 rmd 파일과 같이 github로 업로드 한다음, github 주소를 보내주세요. 같이 드린 reserve.csv는 저작권 문제 떄문에 github에 업로드하면 안됩니다. 
+
+회색 부분에 코드를 작성해주시면 됩니다. 빈칸을 채워야하는 경우는 ##### 처리를 해두었습니다. 
+
+목요일 자정까지 꼭 제출해주세요. 혹시 markdown이나 github 관련하여 어려움이 있으시다면, 언제든지 연락주시면 됩니다. 
+
+
+## 필요한 Package 가져오기 
+이번 과제는 Tidyverse 연습을 하는 것입니다. 
+Tidyverse 패키지를 불러와봅시다. 
+```{r}
+install.packages("tidyverse")
+library(tidyverse)
+```
+
+
+## 데이터 불러오기 
+같이 드린 reserve.csv파일은 호텔 예약 정보를 모아둔 데이터셋입니다. 
+
+reserve.csv
+* reserve_id: 예약 ID
+* hotel_id: 호텔 ID
+* customer_id: 고객 ID
+* reserve_datetime: 예약 일시
+* checkin_date: 체크인 날짜
+* checkin_time: 체크인 시각
+* checkout_date: 체크아웃 날짜 
+* people_num: 숙박 인원
+* totel_price: 합계 금액
+
+
+같이 드린 reserve.csv 파일을 reserve라는 이름의 tibble로 불러와봅시다.
+
+```{r , error=TRUE}
+reserve <- read_csv("reserve.csv")
+reserve
+
+```
+
+Q1: reserve 데이터는 몇개의 row가 있나요? 
+```{r, error=TRUE}
+#4030
+```
+
+
+
+## 가장 저렴한 호텔
+알린이는 친구들과 갈 때 가장 저렴한 호텔을 찾고 있습니다. 1일 기준 평균적인 예약가격이 가장 저렴한 호텔을 찾고 있습니다. 알린이는 해킹 능력이 매우 뛰어나 호텔 데이터베이스를 해킹해서 필요한 데이터를 가져왔지만, 데이터 분석은 해본적이 없어서, 가장 저렴한 호텔이 어딘지 계산하는거에 어려움을 겪고 있습니다. 우리가 도와줍시다. 
+
+Q2. select() 함수를 사용하여 분석에 필요한 열만을 추출하여 reserve_tb라는 새로운 tibble에 저장합시다. 1일 기준 정보가 필요하니까 체크인 체크아웃 날짜도 필요하겠죠? 우선은 사람이 많아도 방 하나 가격은 같다고 가정하고, people_num은 계산에서 제외합시다. 
+
+```{r , error=TRUE}
+reserve_tb <- select(reserve, hotel_id, checkin_date, checkout_date, total_price)
+reserve_tb
+```
+
+tibble은 자동으로 날짜 형식의 chr을 date 타입의 변수로 바꿔줍니다. 밑에는 date 타입의 변수끼리의 차이를 계산하는 방법에 대한 예시입니다. as.Date는 chr을 date 타입으로 바꿔주는 함수이지만, reserve_tb 는 이미 자동으로 date 타입 변수로 만들어졌지요. 
+```{r, error=TRUE}
+as.Date("2016-03-26") - as.Date("2016-03-23")
+```
+class(reserve_tb$checkin_date)
+
+mutate() 함수를 추가해서 num_date 라는, 호텔에 묵은 날짜 변수를 reserve_tb에 추가하여 새로운 데이터 reserve_tb1을 만들어봅시다. 날짜 데이터 다루는 법은 따로 다루지 않았기 때문에, 이번만은 정답을 보여드리겠습니다. 
+```{r, error=TRUE}
+reserve_tb1 <- mutate(reserve_tb, 
+                     num_date = as.numeric(checkout_date - checkin_date)
+                     )
+reserve_tb1
+```
+date끼리의 계산은 difftime으로 time 변수로 저장됩니다. 3 days, 5 days 이렇게 저장되지요. 
+numeric 변수인 total_price와 계산하기 위해서는 num_date도 time 변수형이 아니라, numeric 변수형으로 저장 되어야합니다. 그래서 as.numeric으로 변수형을 바꾸어주었습니다. 
+
+Q3. mutate() 함수를 사용하여 price_per_day라는 1일당 숙박 가격 변수를 추가한 새로운 데이터 reserve_tb2를 만들어봅시다. 
+```{r, error=TRUE}
+reserve_tb2 <- mutate(reserve_tb1,
+                      price_per_day = total_price / num_date
+                      )
+reserve_tb2
+```
+
+Q4. group_by() 와 summarize() 함수를 이용해서 각 호텔별로 1일당 평균 숙박 가격을 계산하여 reserve_tb3에 저장해봅시다. 
+```{r, error=TRUE}
+reserve_tb3 <- group_by(reserve_tb2, hotel_id) %>%
+               summarize(mppd = mean(price_per_day))
+reserve_tb3
+```
+
+Q5. arrange() 함수를 이용하여 1일당 평균 숙박 가격을 오름차순으로 정렬해봅시다. 가장 저렴한 호텔은 어디인가요?
+```{r, error=TRUE}
+arrange(reserve_tb3, mppd)
+```
+
+Q6. 알린이는 형 알령이가 다른 호텔에서 혼자서 4500원에 묶은 사실을 알고 데이터 분석 결과에 의문을 가졌습니다. 아차! people_num에 따라 가격이 달라진다는 걸 고려하지 못했네요. 이번에는 1인 기준으로 다시 summarize()를 해봅시다. 그런데 이번에는 여러 데이터프레임을 계속 저장하지 말고 한번에 계산을 하도록 파이프 (%>%)를 활용하서 한번에 계산을 해보아요!!
+```{r, error=TRUE}
+reserve %>%
+  mutate(num_date = as.numeric(checkout_date - checkin_date)) %>%
+  mutate(ppdp = total_price / (num_date * people_num)) %>%
+  group_by(hotel_id) %>%
+  summarize(mppdp = mean(ppdp)) %>%
+  select(hotel_id, mppdp) %>%
+  arrange(mppdp)
+
+```
+
+
+
+## 호텔 매출 비교
+통린이는 호텔 그룹 CEO 입니다. 최근에 코로나로 디폴트 위기에 처하자, 매출이 낮은 호텔부터 처분하기로 하였습니다. 그런데 통린이는 주가가 하락할때부터 데이터분석 팀을 모두 해고해버렸기 때문에, 현재 가장 매출이 낮은 호텔이 어디인지 알수가 없네요. 통린이는 2017년 6월 이후 예약 기준으로 총 예약횟수 그리고 총 매출을 낮은순으로 나열한 데이터를 깔끔하게 보고 싶습니다. 
+통린이를 도와줍시다!!
+<힌트> summarize에서 count(아무 변수)를 사용하면, 데이터프레임 내에서 그 호텔별로 예약수를 구할 수 있습니다. 
+<힌트> date 비교는 다음과 같이 할 수 있습니다. 
+```{r, error=TRUE}
+# install.packages(lubridate)
+library(lubridate)                    # 날짜와 시간 계산을 용이하게 해주는 패키지
+print(today())                        # today()는 오늘 날짜를 계산하고, print()는 출력을 해줍니다. 
+as.Date("2016-03-14") > today()       # as.Date는 문자열을 date로 바꿔주고, 숫자처럼, <와 >로 날짜를 비교할 수 있습니다. 
+```
+
+여기에 파이프를 사용해서 작성해주세요. 
+```{r, error=TRUE}
+reserve %>%
+  filter(reserve_datetime > as.Date("2017-06-30")) %>%
+  group_by(hotel_id) %>%
+  summarize(rsv = n() , tp = sum(total_price)) %>%
+  arrange(tp, rsv)
+```
+
+
+
+
+
+
+
+
